@@ -3,7 +3,7 @@
 #include <strsafe.h>
 #include <limits.h> // Required by WHEEL_PAGESCROLL -- I think that's a "bug" in the windows headers.
 
-static bool GetDpi_Initialized;
+static BOOL GetDpi_Initialized;
 static HRESULT (WINAPI *pfn_GetDpiForMonitor)(HMONITOR, DWORD, UINT*, UINT*);
 
 INT GetDpi(HWND hWnd, HDC hdc)
@@ -11,6 +11,7 @@ INT GetDpi(HWND hWnd, HDC hdc)
 	if (!GetDpi_Initialized)
 	{
 		HMODULE shcore = LoadLibraryW(L"shcore");
+		// This library will never be unloaded (if we did unload it, the function pointer would become invalid anyway).
 		if (shcore)
 		{
 			pfn_GetDpiForMonitor = (HRESULT (WINAPI *)(HMONITOR, DWORD, UINT*, UINT*))GetProcAddress(shcore, "GetDpiForMonitor");
@@ -31,16 +32,17 @@ INT GetDpi(HWND hWnd, HDC hdc)
 
 	// Need to use GetDeviceCaps.
 	bool NeedReleaseDC = false;
-	if (hdc == NULL)
+	if (hdc == nullptr)
 	{
 		hdc = GetDC(hWnd);
 		NeedReleaseDC = true;
 	}
-	int LogPixelsX = GetDeviceCaps(hdc, LOGPIXELSX);
+	INT LogPixelsX = GetDeviceCaps(hdc, LOGPIXELSX);
+	assert(LogPixelsX != 0);
 	if (NeedReleaseDC)
 	{
 		ReleaseDC(hWnd, hdc);
-		hdc = NULL;
+		hdc = nullptr;
 	}
 	return LogPixelsX;
 }
@@ -49,7 +51,7 @@ INT GetDpi(HWND hWnd, HDC hdc)
 HFONT GetDefaultGuiFontInternal(INT dpi, BOOL *NeedDelete)
 {
 	HFONT StockFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-	assert(StockFont != NULL);
+	assert(StockFont != nullptr);
 	if (dpi == 96)
 	{
 		// No adjustment needed
@@ -60,11 +62,11 @@ HFONT GetDefaultGuiFontInternal(INT dpi, BOOL *NeedDelete)
 	{
 		// DPI scaling needed.
 		LOGFONTW LogFont = {};
-		assert(NULL != GetObjectW(StockFont, sizeof(LogFont), &LogFont));
+		assert(0 != GetObjectW(StockFont, sizeof(LogFont), &LogFont));
 		LogFont.lfHeight = MulDiv(LogFont.lfHeight, dpi, 96);
 
 		HFONT ScaledFont = CreateFontIndirectW(&LogFont);
-		assert(ScaledFont != NULL);
+		assert(ScaledFont != nullptr);
 		*NeedDelete = true;
 		return ScaledFont;
 	}
@@ -80,7 +82,7 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 
 	if (dpi == Cache->Dpi)
 	{
-		assert(Cache->hFont != NULL);
+		assert(Cache->hFont != nullptr);
 		return Cache->hFont;
 	}
 
@@ -89,12 +91,12 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 	{
 		// Clean up old font.
 		DeleteObject(Cache->hFont);
-		Cache->hFont = NULL;
+		Cache->hFont = nullptr;
 		Cache->Dpi = 0;
 		Cache->NeedDelete = false;
 	}
 
-	BOOL NeedDelete;
+	bool NeedDelete;
 	Cache->hFont = GetDefaultGuiFontInternal(dpi, &NeedDelete);
 	Cache->NeedDelete = NeedDelete;
 	Cache->Dpi = dpi;
@@ -104,16 +106,16 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 
 struct GetFirstMatchingFont_LPARAM
 {
-	BOOL Found;
 	LOGFONTW Logfont;
+	bool Found;
 };
 
-static int CALLBACK GetFirstMatchingFont_EnumProc(const LOGFONTW *logfont, const TEXTMETRICW *, DWORD, LPARAM lparam)
+static INT CALLBACK GetFirstMatchingFont_EnumProc(const LOGFONTW *logfont, const TEXTMETRICW *, DWORD, LPARAM lparam)
 {
 	GetFirstMatchingFont_LPARAM *data = (GetFirstMatchingFont_LPARAM*)lparam;
-	if (!data->Found) // Actually should always be FALSE because we stop iteration when we find anything.
+	if (!data->Found) // Actually should always be false because we stop iteration when we find anything.
 	{
-		data->Found = TRUE;
+		data->Found = true;
 		data->Logfont = *logfont;
 	}
 	return 0; // Return 0 means "break". We don't want to continue once the first font was found.
@@ -145,7 +147,7 @@ HFONT GetFirstMatchingFont(HDC hdc, const FONT_DESC *descs, INT num_descs, LOGFO
 		}
 	}
 	// No matching font found.
-	return NULL;
+	return nullptr;
 }
 
 INT GetTextLineHeight(TEXTMETRICW *TextMetric, BOOL WithExternalLeading)
@@ -158,7 +160,7 @@ INT GetClientWidth(HWND hWnd)
 {
 	RECT rc = {};
 	assert(GetClientRect(hWnd, &rc));
-	int ClientWidth = rc.right - rc.left;
+	INT ClientWidth = rc.right - rc.left;
 	return ClientWidth;
 }
 
@@ -166,7 +168,7 @@ INT GetClientHeight(HWND hWnd)
 {
 	RECT rc = {};
 	assert(GetClientRect(hWnd, &rc));
-	int ClientHeight = rc.bottom - rc.top;
+	INT ClientHeight = rc.bottom - rc.top;
 	return ClientHeight;
 }
 
@@ -192,7 +194,7 @@ void ScrollTo(HWND hWnd, INT nBar, SCROLLTO_MODE Mode, INT TargetPosition, const
 		// NOTE: It never happens if you scroll in negative direction, but always if you scroll in positive direction.
 		return;
 	}
-	int LastScrollPos2 = ScrollInfo.nPos;
+	INT LastScrollPos2 = ScrollInfo.nPos;
 
 	switch (Mode)
 	{
@@ -209,36 +211,41 @@ void ScrollTo(HWND hWnd, INT nBar, SCROLLTO_MODE Mode, INT TargetPosition, const
 	}
 
 	ScrollInfo.fMask = SIF_POS;
-	SetScrollInfo(hWnd, nBar, &ScrollInfo, TRUE);
+	SetScrollInfo(hWnd, nBar, &ScrollInfo, true);
 
-	// Read the scroll info back because Windows sanitizes these values internally.
+	// Read the scroll info back because Windows sanitizes these values INTernally.
 	if (!GetScrollInfo(hWnd, nBar, &ScrollInfo))
 	{
 		// Since GetScrollInfo doesn't reliably fail when there are no scroll bars, we must assume that
 		// a second call can fail even though the first call succeeded.
 		// We must invalidate the window here since we're not sure what our SetScrollInfo actually did (or if it did anything at all).
 		// This happens the first time you scroll in positive direction. After that, the first GetScrollInfo will fail.
-		InvalidateRect(hWnd, NULL, TRUE);
+		InvalidateRect(hWnd, nullptr, true);
 		return;
 	}
+
+	// NOTE: nPos will be in the range nMin .. (nMax - nPage + 1)
+	//       This "+1" means that the application must most likely subtract 1 from nMax when setting the range.
+	//assert(ScrollInfo.nPos >= ScrollInfo.nMin);
+	//assert(ScrollInfo.nPos <= ScrollInfo.nMax - ScrollInfo.nPage + 1);
 
 	switch (nBar)
 	{
 		case SB_VERT:
-			assert(ERROR != ScrollWindowEx(hWnd, 0, LastScrollPos2 - ScrollInfo.nPos, ScrollRect, ScrollRect, NULL, nullptr, SW_INVALIDATE | SW_ERASE));
+			assert(ERROR != ScrollWindowEx(hWnd, 0, LastScrollPos2 - ScrollInfo.nPos, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
 			break;
 		case SB_HORZ:
-			assert(ERROR != ScrollWindowEx(hWnd, LastScrollPos2 - ScrollInfo.nPos, 0, ScrollRect, ScrollRect, NULL, nullptr, SW_INVALIDATE | SW_ERASE));
+			assert(ERROR != ScrollWindowEx(hWnd, LastScrollPos2 - ScrollInfo.nPos, 0, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
 			break;
 	}
 	
 	// Should not be needed; only here for certain debugging scenarios.
-	//InvalidateRect(hWnd, NULL, TRUE);
+	//InvalidateRect(hWnd, nullptr, true);
 }
 
 void HandleWindowMessage_Scroll(HWND hWnd, WPARAM wParam, INT nBar, INT ScrollAmountPerLine, const RECT *ScrollRect)
 {
-	int Request = LOWORD(wParam);
+	INT Request = LOWORD(wParam);
 	switch (Request)
 	{
 		case SB_LINEUP:        ScrollTo(hWnd, nBar, SCROLLTO_RELATIVE, -ScrollAmountPerLine, ScrollRect); break;
@@ -255,8 +262,10 @@ void HandleWindowMessage_Scroll(HWND hWnd, WPARAM wParam, INT nBar, INT ScrollAm
 			SCROLLINFO ScrollInfo = {};
 			ScrollInfo.cbSize = sizeof(ScrollInfo);
 			ScrollInfo.fMask = SIF_TRACKPOS;
-			assert(GetScrollInfo(hWnd, nBar, &ScrollInfo));
-			ScrollTo(hWnd, nBar, SCROLLTO_ABSOLUTE, ScrollInfo.nTrackPos, ScrollRect);
+			if (GetScrollInfo(hWnd, nBar, &ScrollInfo))
+			{
+				ScrollTo(hWnd, nBar, SCROLLTO_ABSOLUTE, ScrollInfo.nTrackPos, ScrollRect);
+			}
 			break;
 		}
 	}
@@ -279,7 +288,7 @@ void HandleWindowMessage_MouseWheel(HWND hWnd, WPARAM wParam, INT nBar, INT Scro
 	if (uScroll == WHEEL_PAGESCROLL)
 	{
 		// Scroll a page
-		int Pages = 0;
+		INT Pages = 0;
 		if (zDelta > 0)
 		{
 			Pages = -1;
@@ -292,25 +301,25 @@ void HandleWindowMessage_MouseWheel(HWND hWnd, WPARAM wParam, INT nBar, INT Scro
 	}
 	else
 	{
-		int PixelsToScroll = MulDiv(zDelta, uScroll * ScrollAmountPerLine, WHEEL_DELTA);
+		INT PixelsToScroll = MulDiv(zDelta, uScroll * ScrollAmountPerLine, WHEEL_DELTA);
 		ScrollTo(hWnd, nBar, SCROLLTO_RELATIVE, -PixelsToScroll, ScrollRect);
 	}
 }
 
 BOOL HandleWindowMessage_KeyDown_ForVScroll(HWND hWnd, WPARAM wParam, LPARAM lParam, INT ScrollAmountPerLine, const RECT *ScrollRect)
 {
-	int vk = (int)wParam;
-	int cRepeat = LOWORD(lParam);
+	INT vk = (INT)wParam;
+	INT cRepeat = LOWORD(lParam);
 	switch (vk)
 	{
-		case VK_UP:         ScrollTo(hWnd, SB_VERT, SCROLLTO_RELATIVE, cRepeat * -ScrollAmountPerLine, ScrollRect); return TRUE;
-		case VK_DOWN:       ScrollTo(hWnd, SB_VERT, SCROLLTO_RELATIVE, cRepeat * ScrollAmountPerLine, ScrollRect); return TRUE;
-		case VK_PRIOR:      ScrollTo(hWnd, SB_VERT, SCROLLTO_PAGE, -cRepeat, ScrollRect); return TRUE;
-		case VK_NEXT:       ScrollTo(hWnd, SB_VERT, SCROLLTO_PAGE, cRepeat, ScrollRect); return TRUE;
-		case VK_HOME:       ScrollTo(hWnd, SB_VERT, SCROLLTO_ABSOLUTE, 0, ScrollRect); return TRUE;
-		case VK_END:        ScrollTo(hWnd, SB_VERT, SCROLLTO_ABSOLUTE, MAXINT, ScrollRect); return TRUE;
+		case VK_UP:         ScrollTo(hWnd, SB_VERT, SCROLLTO_RELATIVE, cRepeat * -ScrollAmountPerLine, ScrollRect); return true;
+		case VK_DOWN:       ScrollTo(hWnd, SB_VERT, SCROLLTO_RELATIVE, cRepeat * ScrollAmountPerLine, ScrollRect); return true;
+		case VK_PRIOR:      ScrollTo(hWnd, SB_VERT, SCROLLTO_PAGE, -cRepeat, ScrollRect); return true;
+		case VK_NEXT:       ScrollTo(hWnd, SB_VERT, SCROLLTO_PAGE, cRepeat, ScrollRect); return true;
+		case VK_HOME:       ScrollTo(hWnd, SB_VERT, SCROLLTO_ABSOLUTE, 0, ScrollRect); return true;
+		case VK_END:        ScrollTo(hWnd, SB_VERT, SCROLLTO_ABSOLUTE, MAXINT, ScrollRect); return true;
 	}
-	return FALSE;
+	return false;
 }
 
 INT StrlenMax(LPCWSTR str, INT cchMax)
@@ -337,7 +346,7 @@ void ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 		return;
 	}
 
-	if (Parent != NULL)
+	if (Parent != nullptr)
 	{
 		EnableWindow(Parent, false);
 	}
@@ -357,7 +366,7 @@ void ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 			// Normal way of closing the window. The application is expected to set this to true in its WM_CLOSE.
 			break;
 		}
-		if (GetMessageW(&Msg, NULL, 0, 0))
+		if (GetMessageW(&Msg, nullptr, 0, 0))
 		{
 			if (!IsDialogMessageW(hWnd, &Msg))
 			{
@@ -373,7 +382,7 @@ void ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 		}
 	}
 
-	if (Parent != NULL)
+	if (Parent != nullptr)
 	{
 		EnableWindow(Parent, true);
 		// This is a failsafe measure working around certain Windows "features".
@@ -387,7 +396,7 @@ INT GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi)
 {
 	if (dpi == 0)
 	{
-		dpi = GetDpi(TextBox, NULL);
+		dpi = GetDpi(TextBox, nullptr);
 	}
 
 	// This is taken from .NET source code (TextBoxBase).
@@ -396,10 +405,10 @@ INT GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi)
 	// This 3 pixel size was added in everett and we do this to maintain compat.
 	// old everett behavior was FontHeight + [SystemInformation.BorderSize.Height * 4 + 3]
 	// however the [ ] was only added if borderstyle was not none.
-	int BorderHeight = GetSystemMetricsForDpi(SM_CYBORDER, dpi);
+	INT BorderHeight = GetSystemMetricsForDpi(SM_CYBORDER, dpi);
 
 	HFONT TextBoxFont = (HFONT)SendMessageW(TextBox, WM_GETFONT, 0, 0);
-	if (TextBoxFont == NULL)
+	if (TextBoxFont == nullptr)
 	{
 		TextBoxFont = (HFONT)GetStockObject(SYSTEM_FONT);
 	}
@@ -409,7 +418,7 @@ INT GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi)
 	GetTextMetricsW(hdc, &TextMetric);
 	ReleaseDC(TextBox, hdc);
 
-	int TextBoxFontHeight = TextMetric.tmHeight;
-	int TextBoxHeight = TextBoxFontHeight + BorderHeight * 4 + 3;
+	INT TextBoxFontHeight = TextMetric.tmHeight;
+	INT TextBoxHeight = TextBoxFontHeight + BorderHeight * 4 + 3;
 	return TextBoxHeight;
 }
