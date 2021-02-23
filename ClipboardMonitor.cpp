@@ -243,10 +243,10 @@ static void UpdateCapturedContent(HWND hWnd)
 		SIZE ClientSize = GetClientSize(hWnd);
 		ScrollInfo.fMask = SIF_DISABLENOSCROLL | SIF_PAGE | SIF_RANGE;
 		ScrollInfo.nPage = ClientSize.cy;
-		ScrollInfo.nMax = CurrentImageHeight;
+		ScrollInfo.nMax = CurrentImageHeight - 1;
 		SetScrollInfo(hWnd, SB_VERT, &ScrollInfo, true);
 		ScrollInfo.nPage = ClientSize.cx;
-		ScrollInfo.nMax = CurrentImageWidth;
+		ScrollInfo.nMax = CurrentImageWidth - 1;
 		SetScrollInfo(hWnd, SB_HORZ, &ScrollInfo, true);
 	}
 	else
