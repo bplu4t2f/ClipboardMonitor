@@ -31,7 +31,7 @@ INT GetDpi(HWND hWnd, HDC hdc)
 	}
 
 	// Need to use GetDeviceCaps.
-	bool NeedReleaseDC = false;
+	BOOL NeedReleaseDC = false;
 	if (hdc == nullptr)
 	{
 		hdc = GetDC(hWnd);
@@ -96,7 +96,7 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 		Cache->NeedDelete = false;
 	}
 
-	bool NeedDelete;
+	BOOL NeedDelete;
 	Cache->hFont = GetDefaultGuiFontInternal(dpi, &NeedDelete);
 	Cache->NeedDelete = NeedDelete;
 	Cache->Dpi = dpi;
@@ -107,7 +107,7 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 struct GetFirstMatchingFont_LPARAM
 {
 	LOGFONTW Logfont;
-	bool Found;
+	BOOL Found;
 };
 
 static INT CALLBACK GetFirstMatchingFont_EnumProc(const LOGFONTW *logfont, const TEXTMETRICW *, DWORD, LPARAM lparam)
