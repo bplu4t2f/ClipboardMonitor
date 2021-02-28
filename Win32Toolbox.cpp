@@ -6,6 +6,7 @@
 static BOOL GetDpi_Initialized;
 static HRESULT (WINAPI *pfn_GetDpiForMonitor)(HMONITOR, DWORD, UINT*, UINT*);
 
+// Never returns 0. In case the DPI cannot be determined for whatever Windowsy reason, returns the default 96.
 INT GetDpi(HWND hWnd, HDC hdc)
 {
 	if (!GetDpi_Initialized)
@@ -24,7 +25,7 @@ INT GetDpi(HWND hWnd, HDC hdc)
 		HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY);
 		UINT dpi_x = 0;
 		UINT dpi_y = 0;
-		if (SUCCEEDED(pfn_GetDpiForMonitor(monitor, 0, &dpi_x, &dpi_y)))
+		if (SUCCEEDED(pfn_GetDpiForMonitor(monitor, 0, &dpi_x, &dpi_y)) && dpi_y != 0)
 		{
 			return dpi_y;
 		}
@@ -66,7 +67,8 @@ HFONT GetDefaultGuiFontInternal(INT dpi, BOOL *NeedDelete)
 	{
 		// DPI scaling needed.
 		LOGFONTW LogFont = {};
-		assert(0 != GetObjectW(StockFont, sizeof(LogFont), &LogFont));
+		int tmp = GetObjectW(StockFont, sizeof(LogFont), &LogFont);
+		assert(tmp != 0);
 		LogFont.lfHeight = MulDiv(LogFont.lfHeight, dpi, 96);
 
 		HFONT ScaledFont = CreateFontIndirectW(&LogFont);
@@ -81,7 +83,6 @@ HFONT GetDefaultGuiFont(DEFAULT_GUI_FONT_CACHE *Cache, INT dpi, HWND hWnd, HDC h
 	if (dpi == 0)
 	{
 		dpi = GetDpi(hWnd, hdc);
-		assert(dpi != 0);
 	}
 
 	if (dpi == Cache->Dpi)
@@ -163,7 +164,8 @@ INT GetTextLineHeight(TEXTMETRICW *TextMetric, BOOL WithExternalLeading)
 INT GetClientWidth(HWND hWnd)
 {
 	RECT rc = {};
-	assert(GetClientRect(hWnd, &rc));
+	BOOL tmp = GetClientRect(hWnd, &rc);
+	assert(tmp);
 	INT ClientWidth = rc.right - rc.left;
 	return ClientWidth;
 }
@@ -171,7 +173,8 @@ INT GetClientWidth(HWND hWnd)
 INT GetClientHeight(HWND hWnd)
 {
 	RECT rc = {};
-	assert(GetClientRect(hWnd, &rc));
+	BOOL tmp = GetClientRect(hWnd, &rc);
+	assert(tmp);
 	INT ClientHeight = rc.bottom - rc.top;
 	return ClientHeight;
 }
@@ -179,7 +182,8 @@ INT GetClientHeight(HWND hWnd)
 SIZE GetClientSize(HWND hWnd)
 {
 	RECT rc = {};
-	assert(GetClientRect(hWnd, &rc));
+	BOOL tmp = GetClientRect(hWnd, &rc);
+	assert(tmp);
 	SIZE size = {};
 	size.cx = rc.right - rc.left;
 	size.cy = rc.bottom - rc.top;
@@ -230,21 +234,27 @@ void ScrollTo(HWND hWnd, INT nBar, SCROLLTO_MODE Mode, INT TargetPosition, const
 
 	// NOTE: nPos will be in the range nMin .. (nMax - nPage + 1)
 	//       This "+1" means that the application must most likely subtract 1 from nMax when setting the range.
-	//assert(ScrollInfo.nPos >= ScrollInfo.nMin);
-	//assert(ScrollInfo.nPos <= ScrollInfo.nMax - ScrollInfo.nPage + 1);
+	assert(ScrollInfo.nPos >= ScrollInfo.nMin);
+	assert(ScrollInfo.nPos <= ScrollInfo.nMax - ScrollInfo.nPage + 1);
 
+	BOOL ScrollOK = true;
 	switch (nBar)
 	{
 		case SB_VERT:
-			assert(ERROR != ScrollWindowEx(hWnd, 0, LastScrollPos2 - ScrollInfo.nPos, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
+			int tmp = ScrollWindowEx(hWnd, 0, LastScrollPos2 - ScrollInfo.nPos, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
+			ScrollOK = tmp != ERROR;
 			break;
 		case SB_HORZ:
-			assert(ERROR != ScrollWindowEx(hWnd, LastScrollPos2 - ScrollInfo.nPos, 0, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
+			int tmp = ScrollWindowEx(hWnd, LastScrollPos2 - ScrollInfo.nPos, 0, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
+			ScrollOK = tmp != ERROR;
 			break;
 	}
 	
-	// Should not be needed; only here for certain debugging scenarios.
-	//InvalidateRect(hWnd, nullptr, true);
+	if (!ScrollOK)
+	{
+		// Should not be needed.
+		InvalidateRect(hWnd, nullptr, true);
+	}
 }
 
 void HandleWindowMessage_Scroll(HWND hWnd, WPARAM wParam, INT nBar, INT ScrollAmountPerLine, const RECT *ScrollRect)
@@ -344,8 +354,7 @@ void ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 {
 	HWND Parent = GetParent(hWnd);
 
-	assert(QueryCloseRequested != nullptr);
-	if (*QueryCloseRequested)
+	if (QueryCloseRequested && *QueryCloseRequested)
 	{
 		return;
 	}
@@ -365,7 +374,7 @@ void ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 			// This prevents us from being stuck in the modal loop if the window is destroyed unexpectedly.
 			break;
 		}
-		if (*QueryCloseRequested)
+		if (QueryCloseRequested && *QueryCloseRequested)
 		{
 			// Normal way of closing the window. The application is expected to set this to true in its WM_CLOSE.
 			break;
@@ -490,7 +499,8 @@ HBITMAP CreateDIBFromPackedDIB(BITMAPINFOHEADER *PackedDIB, SIZE_T PackedDIBSize
 	// Need to copy the data from the clipboard to the new DIBSection.
 	BITMAP BitmapDescLocal; // Need this in case BitmapDesc is null.
 	if (BitmapDesc == nullptr) BitmapDesc = &BitmapDescLocal;
-	assert(GetObjectW(hBitmap, sizeof(*BitmapDesc), BitmapDesc));
+	int tmp = GetObjectW(hBitmap, sizeof(*BitmapDesc), BitmapDesc);
+	assert(tmp != 0);
 	SIZE_T PixelDataBytesToCopy = (SIZE_T)BitmapDesc->bmHeight * BitmapDesc->bmWidthBytes;
 	SIZE_T PixelDataBytesAvailable = PackedDIBSizeCb - PixelDataOffset;
 	if (PixelDataBytesAvailable < PixelDataBytesToCopy)
