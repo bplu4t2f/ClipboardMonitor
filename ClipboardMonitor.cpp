@@ -322,9 +322,9 @@ static void UpdateMenuState(HWND hWnd, HMENU hMenu)
 			break;
 	}
 	MenuItemInfo.dwTypeData = (LPWSTR)Text;
-	assert(SetMenuItemInfoW(hMenu, IDM_TOGGLE_AUTO, false, &MenuItemInfo));
+	BOOL b = SetMenuItemInfoW(hMenu, IDM_TOGGLE_AUTO, false, &MenuItemInfo); assert(b);
 
-	assert(DrawMenuBar(hWnd));
+	b = DrawMenuBar(hWnd); assert(tmp);
 }
 
 
@@ -334,9 +334,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		case WM_CREATE:
 		{
-			BufferedPaintInit();
+			HRESULT hr = BufferedPaintInit(); assert(SUCCEEDED(hr));
 
-			assert(AddClipboardFormatListener(hWnd));
+			BOOL b = AddClipboardFormatListener(hWnd); assert(b);
 
 			HMENU Menu = CreateMenu();
 			assert(Menu != nullptr);
@@ -346,15 +346,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			MenuItemInfo.fType = MFT_STRING;
 			MenuItemInfo.wID = IDM_CLEAR_CLIPBOARD;
 			MenuItemInfo.dwTypeData = (LPWSTR)L"Clear Clipboard Data";
-			assert(InsertMenuItemW(Menu, 0, false, &MenuItemInfo));
+			b = InsertMenuItemW(Menu, 0, false, &MenuItemInfo); assert(b);
 			MenuItemInfo.wID = IDM_REFRESH;
 			MenuItemInfo.dwTypeData = (LPWSTR)L"Refresh (F5)";
-			assert(InsertMenuItemW(Menu, 0, false, &MenuItemInfo));
+			b = InsertMenuItemW(Menu, 0, false, &MenuItemInfo); assert(b);
 			MenuItemInfo.wID = IDM_TOGGLE_AUTO;
 			MenuItemInfo.dwTypeData = (LPWSTR)L"";
-			assert(InsertMenuItemW(Menu, 0, false, &MenuItemInfo));
+			b = InsertMenuItemW(Menu, 0, false, &MenuItemInfo); assert(b);
 
-			assert(SetMenu(hWnd, Menu));
+			b = SetMenu(hWnd, Menu); assert(b);
 
 			UpdateMenuState(hWnd, Menu);
 			UpdateCapturedContent(hWnd);

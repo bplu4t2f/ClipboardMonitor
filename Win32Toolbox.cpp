@@ -237,20 +237,21 @@ void ScrollTo(HWND hWnd, INT nBar, SCROLLTO_MODE Mode, INT TargetPosition, const
 	assert(ScrollInfo.nPos >= ScrollInfo.nMin);
 	assert(ScrollInfo.nPos <= ScrollInfo.nMax - ScrollInfo.nPage + 1);
 
-	BOOL ScrollOK = true;
+	int dx = 0;
+	int dy = 0;
 	switch (nBar)
 	{
 		case SB_VERT:
-			int tmp = ScrollWindowEx(hWnd, 0, LastScrollPos2 - ScrollInfo.nPos, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
-			ScrollOK = tmp != ERROR;
+			dx = 0;
+			dy = LastScrollPos2 - ScrollInfo.nPos;
 			break;
 		case SB_HORZ:
-			int tmp = ScrollWindowEx(hWnd, LastScrollPos2 - ScrollInfo.nPos, 0, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE));
-			ScrollOK = tmp != ERROR;
+			dx = LastScrollPos2 - ScrollInfo.nPos;
+			dy = 0;
 			break;
 	}
-	
-	if (!ScrollOK)
+
+	if (ERROR == ScrollWindowEx(hWnd, dx, dy, ScrollRect, ScrollRect, nullptr, nullptr, SW_INVALIDATE | SW_ERASE))
 	{
 		// Should not be needed.
 		InvalidateRect(hWnd, nullptr, true);
