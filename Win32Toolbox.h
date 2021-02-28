@@ -30,6 +30,8 @@ extern BOOL                HandleWindowMessage_KeyDown_ForVScroll(HWND hWnd, WPA
 extern INT                 StrlenMax(LPCWSTR str, INT cchMax);
 extern void                ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested);
 extern INT                 GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi);
+extern INT                 GetPixelDataOffsetForPackedDIB(const BITMAPINFOHEADER *BitmapInfoHeader);
+extern HBITMAP             CreateDIBFromPackedDIB(BITMAPINFOHEADER *PackedDIB, SIZE_T PackedDIBSizeCb, BITMAP *BitmapDesc);
 
 struct DEFAULT_GUI_FONT_CACHE
 {

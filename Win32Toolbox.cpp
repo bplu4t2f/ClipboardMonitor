@@ -422,3 +422,79 @@ INT GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi)
 	INT TextBoxHeight = TextBoxFontHeight + BorderHeight * 4 + 3;
 	return TextBoxHeight;
 }
+
+
+// Returns the offset, in bytes, from the start of the BITMAPINFO, to the start of the pixel data array, for a packed DIB.
+INT GetPixelDataOffsetForPackedDIB(const BITMAPINFOHEADER *BitmapInfoHeader)
+{
+	if (BitmapInfoHeader->biSize < sizeof(BITMAPINFOHEADER))
+	{
+		return 0; // Not a valid BITMAPINFOHEADER. This may be an ancient BITMAPCOREHEADER, which is not supported.
+	}
+
+	INT OffsetExtra = 0;
+
+	if (BitmapInfoHeader->biSize == sizeof(BITMAPINFOHEADER) /* 40 */)
+	{
+		// This is the common BITMAPINFOHEADER type. In this case, there may be bit masks following the BITMAPINFOHEADER
+		// and before the actual pixel bits (does not apply if bitmap has <= 8 bpp)
+		if (BitmapInfoHeader->biBitCount > 8)
+		{
+			if (BitmapInfoHeader->biCompression == BI_BITFIELDS)
+			{
+				OffsetExtra += 3 * sizeof(RGBQUAD);
+			}
+			else if (BitmapInfoHeader->biCompression == 6 /* BI_ALPHABITFIELDS */)
+			{
+				// Not widely supported, but valid.
+				OffsetExtra += 4 * sizeof(RGBQUAD);
+			}
+		}
+	}
+
+	if (BitmapInfoHeader->biClrUsed > 0)
+	{
+		// We have no choice but to trust this value.
+		OffsetExtra += BitmapInfoHeader->biClrUsed * sizeof(RGBQUAD);
+	}
+	else
+	{
+		// In this case, the color table contains the maximum number for the current bit count (0 if > 8bpp)
+		if (BitmapInfoHeader->biBitCount <= 8)
+		{
+			// 1bpp: 2
+			// 4bpp: 16
+			// 8bpp: 256
+			OffsetExtra += sizeof(RGBQUAD) << BitmapInfoHeader->biBitCount;
+		}
+	}
+
+	return BitmapInfoHeader->biSize + OffsetExtra;
+}
+
+
+HBITMAP CreateDIBFromPackedDIB(BITMAPINFOHEADER *PackedDIB, SIZE_T PackedDIBSizeCb, BITMAP *BitmapDesc)
+{
+	INT PixelDataOffset = GetPixelDataOffsetForPackedDIB(PackedDIB);
+	if (PixelDataOffset == 0) return nullptr;
+
+	BYTE *PixelDataFromClipboard = (BYTE *)PackedDIB + PixelDataOffset;
+	void *PixelDataNew;
+	HBITMAP hBitmap = CreateDIBSection(NULL, (BITMAPINFO *)PackedDIB, DIB_RGB_COLORS, &PixelDataNew, NULL, 0);
+	if (hBitmap == nullptr) return nullptr; // This will only work if the DIB format is supported by GDI. Not all valid DIB formats are supported.
+
+	// Need to copy the data from the clipboard to the new DIBSection.
+	BITMAP BitmapDescLocal; // Need this in case BitmapDesc is null.
+	if (BitmapDesc == nullptr) BitmapDesc = &BitmapDescLocal;
+	assert(GetObjectW(hBitmap, sizeof(*BitmapDesc), BitmapDesc));
+	SIZE_T PixelDataBytesToCopy = (SIZE_T)BitmapDesc->bmHeight * BitmapDesc->bmWidthBytes;
+	SIZE_T PixelDataBytesAvailable = PackedDIBSizeCb - PixelDataOffset;
+	if (PixelDataBytesAvailable < PixelDataBytesToCopy)
+	{
+		// Malformed data; doesn't contain enough pixels. We'll do what we can.
+		PixelDataBytesToCopy = PixelDataBytesAvailable;
+	}
+	memcpy(PixelDataNew, PixelDataFromClipboard, PixelDataBytesToCopy);
+
+	return hBitmap;
+}

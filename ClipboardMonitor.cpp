@@ -130,6 +130,18 @@ static HWND CreateEditControl(HWND Parent)
 }
 
 
+static BOOL OpenClipboard_ButTryABitHarder(HWND hWnd)
+{
+	for (int i = 0; i < 20; ++i)
+	{
+		// This can fail if the clipboard is currently being accessed by another application.
+		if (OpenClipboard(hWnd)) return true;
+		Sleep(10);
+	}
+	return false;
+}
+
+
 static void UpdateClipboard(HWND hWnd)
 {
 	DeleteObject(CurrentImage);
@@ -137,90 +149,64 @@ static void UpdateClipboard(HWND hWnd)
 	free(CurrentText);
 	CurrentText = nullptr;
 
-	for (int i = 0; i < 20; ++i)
+	if (OpenClipboard_ButTryABitHarder(hWnd))
 	{
-		if (OpenClipboard(hWnd))
+		UINT KnownFormats[] =
 		{
-			goto _success;
-		}
-		Sleep(10);
-	}
+			CF_DIB,
+			CF_TEXT
+		};
+		int ClipboardFormat = GetPriorityClipboardFormat(KnownFormats, _countof(KnownFormats));
 
-	return;
-
-_success:
-
-	UINT KnownFormats[] =
-	{
-		CF_BITMAP,
-		CF_TEXT
-	};
-	int ClipboardFormat = GetPriorityClipboardFormat(KnownFormats, _countof(KnownFormats));
-
-	switch (ClipboardFormat)
-	{
-		case CF_BITMAP:
+		switch (ClipboardFormat)
 		{
-			HBITMAP ClipboardDataHandle = (HBITMAP)GetClipboardData(CF_BITMAP);
-			if (ClipboardDataHandle != nullptr)
+			case CF_DIB:
 			{
-				HDC hdc = GetDC(hWnd);
-				assert(hdc != nullptr);
-				
-				HDC src = CreateCompatibleDC(hdc);
-				assert(src != nullptr);
-				HDC dst = CreateCompatibleDC(hdc);
-				assert(dst != nullptr);
-
-				ReleaseDC(hWnd, hdc);
-				hdc = nullptr;
-
-				BITMAP BitmapDesc = {};
-				GetObjectW(ClipboardDataHandle, sizeof(BitmapDesc), &BitmapDesc);
-
-				CurrentImage = CreateCopyBitmap(dst, BitmapDesc.bmWidth, BitmapDesc.bmHeight);
-				CurrentImageWidth = BitmapDesc.bmWidth;
-				CurrentImageHeight = BitmapDesc.bmHeight;
-
-				BITMAP BitmapDesc2 = {};
-				GetObjectW(CurrentImage, sizeof(BitmapDesc2), &BitmapDesc2);
-				
-				SelectObject(src, ClipboardDataHandle);
-				SelectObject(dst, CurrentImage);
-				BitBlt(dst, 0, 0, BitmapDesc.bmWidth, BitmapDesc.bmHeight, src, 0, 0, SRCCOPY);
-
-				DeleteDC(src);
-				DeleteDC(dst);
-			}
-			break;
-		}
-
-		case CF_TEXT:
-		{
-			HANDLE ClipboardTextHandle = GetClipboardData(CF_UNICODETEXT);;
-			if (ClipboardTextHandle != nullptr)
-			{
-				LPCWSTR ClipboardText = (LPCWSTR)GlobalLock(ClipboardTextHandle);
-				if (ClipboardText != nullptr)
+				HGLOBAL ClipboardDataHandle = GetClipboardData(CF_DIB);
+				if (ClipboardDataHandle)
 				{
-					size_t Length;
-					if (SUCCEEDED(StringCchLengthW(ClipboardText, 100000, &Length)))
+					BITMAPINFOHEADER *BitmapInfoHeader = (BITMAPINFOHEADER *)GlobalLock(ClipboardDataHandle);
+					SIZE_T ClipboardDataSize = GlobalSize(ClipboardDataHandle);
+					if (BitmapInfoHeader)
 					{
-						CurrentText = (LPWSTR)malloc(sizeof(WCHAR) * (Length + 1));
-						if (CurrentText != nullptr)
+						BITMAP BitmapDesc = {};
+						HBITMAP hBitmap = CreateDIBFromPackedDIB(BitmapInfoHeader, ClipboardDataSize, &BitmapDesc);
+						if (hBitmap)
 						{
-							memcpy(CurrentText, ClipboardText, sizeof(WCHAR) * Length);
-							CurrentText[Length] = 0;
+							CurrentImage = hBitmap;
+							CurrentImageWidth = BitmapDesc.bmWidth;
+							CurrentImageHeight = BitmapDesc.bmHeight;
 						}
 					}
 				}
-				GlobalUnlock(ClipboardTextHandle);
+				break;
 			}
-			break;
-		}
-	}
 
-	CloseClipboard();
+			case CF_TEXT:
+			{
+				HANDLE ClipboardTextHandle = GetClipboardData(CF_UNICODETEXT);;
+				if (ClipboardTextHandle != nullptr)
+				{
+					LPCWSTR ClipboardText = (LPCWSTR)GlobalLock(ClipboardTextHandle);
+					SIZE_T ClipboardTextLength = GlobalSize(ClipboardTextHandle);
+					if (ClipboardText != nullptr)
+					{
+						// Add a terminating 0 just in case the original data doesn't have one.
+						CurrentText = (LPWSTR)malloc(sizeof(WCHAR) * (ClipboardTextLength + 1));
+						if (CurrentText != nullptr)
+						{
+							CurrentText[ClipboardTextLength] = 0;
+							memcpy(CurrentText, ClipboardText, sizeof(WCHAR) * ClipboardTextLength);
+						}
+					}
+					GlobalUnlock(ClipboardTextHandle);
+				}
+				break;
+			}
+		}
+
+		CloseClipboard();
+	}
 
 	UpdateCapturedContent(hWnd);
 }
@@ -383,10 +369,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				case IDM_CLEAR_CLIPBOARD:
 				{
-					OpenClipboard(hWnd);
-					EmptyClipboard();
-					CloseClipboard();
-					InvalidateRect(hWnd, nullptr, false);
+					if (OpenClipboard_ButTryABitHarder(hWnd))
+					{
+						EmptyClipboard();
+						CloseClipboard();
+						InvalidateRect(hWnd, nullptr, false);
+					}
 					break;
 				}
 				case IDM_REFRESH:
