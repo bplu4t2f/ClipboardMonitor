@@ -7,6 +7,7 @@
 
 struct DEFAULT_GUI_FONT_CACHE;
 struct FONT_DESC;
+struct HEAP_POOL;
 
 enum SCROLLTO_MODE
 {
@@ -32,6 +33,10 @@ extern void                ShowWindowModal(HWND hWnd, BOOL *QueryCloseRequested)
 extern INT                 GetDefaultSinglelineEditBoxHeight(HWND TextBox, INT dpi);
 extern INT                 GetPixelDataOffsetForPackedDIB(const BITMAPINFOHEADER *BitmapInfoHeader);
 extern HBITMAP             CreateDIBFromPackedDIB(BITMAPINFOHEADER *PackedDIB, SIZE_T PackedDIBSizeCb, BITMAP *BitmapDesc);
+extern BOOL                HeapPoolEnsure(HEAP_POOL *Pool, SIZE_T Size);
+extern void                HeapPoolFree(HEAP_POOL *Pool);
+extern LPCWSTR             GetFullFontFaceNameFromHDC(HDC hdc, HEAP_POOL *Pool);
+extern LPCWSTR             GetFullFontFaceName(HFONT hFont, HEAP_POOL *Pool);
 
 struct DEFAULT_GUI_FONT_CACHE
 {
@@ -45,6 +50,12 @@ struct FONT_DESC
 	const WCHAR *Name;
 	int Height;
 	// Could add weight, italic, etc...
+};
+
+struct HEAP_POOL
+{
+	void *Data;
+	size_t Size;
 };
 
 // This can be used with DialogBoxIndirectParamW, or CreateDialogIndirectParamW, to create an empty dialog (DLGTEMPLATE won't cut it).

@@ -513,3 +513,50 @@ HBITMAP CreateDIBFromPackedDIB(BITMAPINFOHEADER *PackedDIB, SIZE_T PackedDIBSize
 
 	return hBitmap;
 }
+
+
+BOOL HeapPoolEnsure(HEAP_POOL *Pool, SIZE_T Size)
+{
+	if (Pool->Data == nullptr || Pool->Size < Size)
+	{
+		// Need to allocate a [bigger] piece of memory.
+		HANDLE Heap = GetProcessHeap();
+		HeapFree(Heap, 0, Pool->Data);
+		Pool->Data = (OUTLINETEXTMETRICW *)HeapAlloc(GetProcessHeap(), 0, Size);
+		Pool->Size = Size;
+		if (!Pool->Data) return false;
+	}
+	return true;
+}
+
+void HeapPoolFree(HEAP_POOL *Pool)
+{
+	HeapFree(GetProcessHeap(), 0, Pool->Data);
+	Pool->Data = nullptr;
+	Pool->Size = 0;
+}
+
+
+LPCWSTR GetFullFontFaceNameFromHDC(HDC hdc, HEAP_POOL *Pool)
+{
+	// Use this to get the full font name (LOGFONTW only contains the first 31 characters).
+	UINT OtmRequired = GetOutlineTextMetricsW(hdc, 0, nullptr);
+	if (OtmRequired == 0) return nullptr;
+	if (!HeapPoolEnsure(Pool, (SIZE_T)OtmRequired + 64 /* some extra to reduce number of required allocations */)) return nullptr;
+	OUTLINETEXTMETRIC *Otm = (OUTLINETEXTMETRIC *)Pool->Data;
+	GetOutlineTextMetricsW(hdc, OtmRequired, Otm);
+	LPCWSTR FontName = (LPCWSTR)((BYTE *)Otm + (INT_PTR)Otm->otmpFaceName /* this is actually an offset, not a string */);
+	return FontName;
+}
+
+
+// Consider using GetFullFontFaceNameFromHDC for better performance. This avoids allocating HDC.
+LPCWSTR GetFullFontFaceName(HFONT hFont, HEAP_POOL *Pool)
+{
+	HDC hdc = CreateCompatibleDC(nullptr);
+	if (hdc == nullptr) return nullptr;
+	SelectObject(hdc, hFont);
+	LPCWSTR Result = GetFullFontFaceNameFromHDC(hdc, Pool);
+	DeleteDC(hdc);
+	return Result;
+}
