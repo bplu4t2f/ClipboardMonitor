@@ -12,6 +12,9 @@
 #include "Win32Toolbox.h"
 
 
+#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+
 // Forward declarations of functions included in this code module:
 static ATOM                MyRegisterClass(HINSTANCE hInstance);
 static LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -101,21 +104,20 @@ static HBITMAP CreateCopyBitmap(HDC hdc, LONG Width, LONG Height)
 HFONT FontMonospace;
 
 
-static HWND CreateEditControl(HWND Parent)
+static void SetEditControlFont(HWND Edit, HWND Parent)
 {
-	SIZE ClientSize = GetClientSize(Parent);
-	HWND Edit = CreateWindowExW(0, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_WANTRETURN, 0, 0, ClientSize.cx, ClientSize.cy, Parent, nullptr, hInst, nullptr);
-	assert(Edit != nullptr);
-
 	if (FontMonospace == nullptr)
 	{
+		HDC hdc = GetDC(Parent);
+		INT dpi = GetDpi(Parent, hdc);
+		INT FontSizePx = MulDiv(12 /*12pt*/, dpi, 72);
+
 		FONT_DESC font_descs[] =
 		{
-			{ L"Consolas", 16 },
-			{ L"Courier New", 16 }
+			{ L"Consolas", FontSizePx },
+			{ L"Courier New", FontSizePx }
 		};
 
-		HDC hdc = GetDC(Parent);
 		FontMonospace = GetFirstMatchingFont(hdc, font_descs, sizeof(font_descs) / sizeof(font_descs[0]), nullptr);
 		ReleaseDC(Parent, hdc);
 		if (FontMonospace == NULL)
@@ -126,6 +128,17 @@ static HWND CreateEditControl(HWND Parent)
 	}
 
 	SendMessageW(Edit, WM_SETFONT, (WPARAM)(HFONT)FontMonospace, 0);
+}
+
+
+static HWND CreateEditControl(HWND Parent)
+{
+	SIZE ClientSize = GetClientSize(Parent);
+	HWND Edit = CreateWindowExW(0, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_WANTRETURN, 0, 0, ClientSize.cx, ClientSize.cy, Parent, nullptr, hInst, nullptr);
+	assert(Edit != nullptr);
+
+	SetEditControlFont(Edit, Parent);
+	
 	return Edit;
 }
 
@@ -347,6 +360,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			UpdateCapturedContent(hWnd);
 
 			return 0;
+		}
+
+		case WM_DPICHANGED:
+		{
+			if (CurrentEditControl != nullptr)
+			{
+				HFONT OldFont = FontMonospace;
+				FontMonospace = nullptr;
+				SetEditControlFont(CurrentEditControl, hWnd);
+				if (OldFont)
+				{
+					DeleteObject(OldFont);
+				}
+			}
+			break;
 		}
 
 		case WM_KEYDOWN:

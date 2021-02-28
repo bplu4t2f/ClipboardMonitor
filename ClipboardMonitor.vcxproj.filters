@@ -27,4 +27,7 @@
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="DpiAwareness.manifest" />
+  </ItemGroup>
 </Project>

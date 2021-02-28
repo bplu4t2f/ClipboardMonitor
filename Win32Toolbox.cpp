@@ -26,7 +26,7 @@ INT GetDpi(HWND hWnd, HDC hdc)
 		UINT dpi_y = 0;
 		if (SUCCEEDED(pfn_GetDpiForMonitor(monitor, 0, &dpi_x, &dpi_y)))
 		{
-			return dpi_x;
+			return dpi_y;
 		}
 	}
 
@@ -37,14 +37,18 @@ INT GetDpi(HWND hWnd, HDC hdc)
 		hdc = GetDC(hWnd);
 		NeedReleaseDC = true;
 	}
-	INT LogPixelsX = GetDeviceCaps(hdc, LOGPIXELSX);
-	assert(LogPixelsX != 0);
+	INT LogPixelsY = GetDeviceCaps(hdc, LOGPIXELSY);
+	if (LogPixelsY == 0)
+	{
+		// Failsafe default value. Should never happen.
+		LogPixelsY = 96;
+	}
 	if (NeedReleaseDC)
 	{
 		ReleaseDC(hWnd, hdc);
 		hdc = nullptr;
 	}
-	return LogPixelsX;
+	return LogPixelsY;
 }
 
 
