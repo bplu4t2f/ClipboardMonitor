@@ -167,7 +167,7 @@ static void UpdateClipboard(HWND hWnd)
 		UINT KnownFormats[] =
 		{
 			CF_DIB,
-			CF_TEXT
+			CF_UNICODETEXT
 		};
 		int ClipboardFormat = GetPriorityClipboardFormat(KnownFormats, _countof(KnownFormats));
 
@@ -195,9 +195,9 @@ static void UpdateClipboard(HWND hWnd)
 				break;
 			}
 
-			case CF_TEXT:
+			case CF_UNICODETEXT:
 			{
-				HANDLE ClipboardTextHandle = GetClipboardData(CF_UNICODETEXT);;
+				HANDLE ClipboardTextHandle = GetClipboardData(CF_UNICODETEXT);
 				if (ClipboardTextHandle != nullptr)
 				{
 					LPCWSTR ClipboardText = (LPCWSTR)GlobalLock(ClipboardTextHandle);
