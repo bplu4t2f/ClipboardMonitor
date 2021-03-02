@@ -62,7 +62,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.cbWndExtra     = 0;
 	wcex.hInstance      = hInstance;
 	wcex.hIcon          = nullptr;
-	wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
+	wcex.hCursor        = LoadCursorW(nullptr, IDC_ARROW);
 	wcex.hbrBackground  = nullptr;
 	wcex.lpszMenuName   = nullptr;
 	wcex.lpszClassName  = L"ClipboardMonitorMainWindow";
@@ -83,25 +83,7 @@ static LONG CurrentImageHeight;
 
 static LPWSTR CurrentText;
 static HWND CurrentEditControl;
-
-
-static HBITMAP CreateCopyBitmap(HDC hdc, LONG Width, LONG Height)
-{
-	BITMAPINFOHEADER BitmapInfo = {};
-	BitmapInfo.biSize = sizeof(BitmapInfo);
-	BitmapInfo.biWidth = Width;
-	BitmapInfo.biHeight = Height;
-	BitmapInfo.biPlanes = 1;
-	BitmapInfo.biBitCount = 24;
-	BitmapInfo.biCompression = BI_RGB;
-	void *Bits = nullptr;
-	HBITMAP Bitmap = CreateDIBSection(hdc, (BITMAPINFO *)&BitmapInfo, DIB_RGB_COLORS, &Bits, nullptr, 0);
-	assert(Bitmap != nullptr);
-	return Bitmap;
-}
-
-
-HFONT FontMonospace;
+static HFONT FontMonospace;
 
 
 static void SetEditControlFont(HWND Edit, HWND Parent)
@@ -134,7 +116,7 @@ static void SetEditControlFont(HWND Edit, HWND Parent)
 static HWND CreateEditControl(HWND Parent)
 {
 	SIZE ClientSize = GetClientSize(Parent);
-	HWND Edit = CreateWindowExW(0, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_WANTRETURN, 0, 0, ClientSize.cx, ClientSize.cy, Parent, nullptr, hInst, nullptr);
+	HWND Edit = CreateWindowExW(0, WC_EDITW, nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_WANTRETURN, 0, 0, ClientSize.cx, ClientSize.cy, Parent, nullptr, hInst, nullptr);
 	assert(Edit != nullptr);
 
 	SetEditControlFont(Edit, Parent);
@@ -324,7 +306,7 @@ static void UpdateMenuState(HWND hWnd, HMENU hMenu)
 	MenuItemInfo.dwTypeData = (LPWSTR)Text;
 	BOOL b = SetMenuItemInfoW(hMenu, IDM_TOGGLE_AUTO, false, &MenuItemInfo); assert(b);
 
-	b = DrawMenuBar(hWnd); assert(tmp);
+	b = DrawMenuBar(hWnd); assert(b);
 }
 
 
