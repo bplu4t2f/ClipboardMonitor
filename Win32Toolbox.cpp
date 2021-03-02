@@ -235,7 +235,7 @@ void ScrollTo(HWND hWnd, INT nBar, SCROLLTO_MODE Mode, INT TargetPosition, const
 	// NOTE: nPos will be in the range nMin .. (nMax - nPage + 1)
 	//       This "+1" means that the application must most likely subtract 1 from nMax when setting the range.
 	assert(ScrollInfo.nPos >= ScrollInfo.nMin);
-	assert(ScrollInfo.nPos <= ScrollInfo.nMax - ScrollInfo.nPage + 1);
+	assert(ScrollInfo.nPos <= ScrollInfo.nMax - (int)ScrollInfo.nPage + 1);
 
 	int dx = 0;
 	int dy = 0;
